@@ -1,0 +1,13 @@
+{
+  "name": "online-yildiz-auto",
+  "version": "1.0.0",
+  "description": "Automatically joins Yildiz online classes via Playwright",
+  "main": "attend.js",
+  "scripts": {
+    "setup-login": "node setup.js",
+    "attend": "node attend.js"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}
