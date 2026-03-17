@@ -21,6 +21,11 @@ npm install
 npx playwright install chrome
 ```
 
+### 2. Create these file
+
+- create config.js file and copy the content of config.example.js to it and enter the data of your classes
+- create setup-task.ps1 file and copy the content of setup-task.example.ps1 to and enter data of your classes and make sure it is consistent with the one in config.js, this file will register the tasks on windows task schedular relieving u from registering them manually
+
 ### 2. Log in once (saves your session)
 
 ```powershell

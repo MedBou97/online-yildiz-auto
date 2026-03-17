@@ -56,28 +56,42 @@ foreach ($cls in $taskClasses) {
     $dayOfWeek = $cls.DayOfWeek
     $startTime = '{0:D2}:{1:D2}' -f $cls.Hour, $cls.Minute
 
+    $dayMap = @{
+        MON = 'Monday'
+        TUE = 'Tuesday'
+        WED = 'Wednesday'
+        THU = 'Thursday'
+        FRI = 'Friday'
+        SAT = 'Saturday'
+        SUN = 'Sunday'
+    }
+    $triggerDay = if ($dayMap.ContainsKey($dayOfWeek)) { $dayMap[$dayOfWeek] } else { $dayOfWeek }
+
     Write-Host ''
     Write-Host "Registering task: $taskName (every $dayOfWeek at $startTime)"
 
-    # Delete old task if it exists. Ignore errors when it does not exist.
-    cmd /c "schtasks /delete /tn \"$taskName\" /f >nul 2>nul" | Out-Null
+    try {
+        # Delete old task if it exists.
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 
-    $action = "`"$nodePath`" `"$attendScript`" $classId"
+        $taskAction = New-ScheduledTaskAction -Execute $nodePath -Argument "`"$attendScript`" $classId" -WorkingDirectory $scriptDir
+        $taskTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $triggerDay -At $startTime
+        $taskSettings = New-ScheduledTaskSettingsSet -WakeToRun -RunOnlyIfNetworkAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        $taskPrincipal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 
-    schtasks /create `
-        /tn $taskName `
-        /tr $action `
-        /sc WEEKLY `
-        /d $dayOfWeek `
-        /st $startTime `
-        /rl LIMITED `
-        /f | Out-Null
+        Register-ScheduledTask `
+            -TaskName $taskName `
+            -Action $taskAction `
+            -Trigger $taskTrigger `
+            -Settings $taskSettings `
+            -Principal $taskPrincipal `
+            -Force | Out-Null
 
-    if ($LASTEXITCODE -eq 0) {
         Write-Host '  OK - task registered successfully.'
     }
-    else {
+    catch {
         Write-Warning "  Failed to register task: $taskName"
+        Write-Warning "  $_"
     }
 }
 
