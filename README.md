@@ -1,17 +1,19 @@
 # Yildiz Online Class Automation
 
-Automatically opens your class page on [online.yildiz.edu.tr](https://online.yildiz.edu.tr/) and clicks **"Canlı Derse Katıl"** at the scheduled time — no manual login required after the first setup.
+This project opens your class page on [online.yildiz.edu.tr](https://online.yildiz.edu.tr/), clicks **Derse Katil**, and then attempts to click the Zoom launch popup automatically.
+
+After the initial setup, it can run on schedule without manual login.
 
 ---
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18 or later)
-- Google Chrome installed
+- Google Chrome
 
 ---
 
-## First-time setup
+## First-Time Setup
 
 ### 1. Install dependencies
 
@@ -21,46 +23,54 @@ npm install
 npx playwright install chrome
 ```
 
-### 2. Create these file
+### 2. Create configuration files
 
-- create config.js file and copy the content of config.example.js to it and enter the data of your classes
-- create setup-task.ps1 file and copy the content of setup-task.example.ps1 to and enter data of your classes and make sure it is consistent with the one in config.js, this file will register the tasks on windows task schedular relieving u from registering them manually
+1. Create `config.js` by copying `config.example.js`, then add your class data.
+2. Create `setup-task.ps1` by copying `setup-task.example.ps1`, then update task entries so they match `config.js`.
 
-### 2. Log in once (saves your session)
+### 3. Log in once (save browser session)
 
 ```powershell
 node setup.js
 ```
 
-- Chrome opens with a fresh dedicated profile and navigates to the site.
-- **Log in manually** in the browser window.
-- Once logged in, click **Resume** in the Playwright Inspector that appears.
-- The browser closes and your session is saved to `./chrome-profile/`.
+- Chrome opens with a dedicated profile and navigates to the site.
+- Log in manually in that Chrome window.
+- In the Playwright Inspector, click **Resume** (the green triangle on the toolbar).
+- The browser closes and your session is saved in `./chrome-profile/`.
 
-> You only need to do this once. Subsequent runs reuse the saved cookies.
+You only need to do this once. Future runs reuse the saved session cookies.
 
-### 3. Register the Windows Task Scheduler task
+### 4. Register Windows Task Scheduler tasks
 
-Open PowerShell **as Administrator**, then:
+Open PowerShell **as Administrator**, then run:
 
 ```powershell
 cd C:\automation\online-yildiz-auto
 .\setup-task.ps1
 ```
 
-This registers a weekly task called `YildizOnlineClass-Turkce2` that runs every **Monday at 11:00**.
+This registers the weekly tasks defined in `setup-task.ps1` (for example: `YTU-Turkce2`, `YTU-Ataturk2`, `YTU-DavranisBilimi`).
 
-Verify in Task Scheduler (`taskschd.msc`) or run manually:
+To test a task manually:
 
 ```powershell
-schtasks /run /tn YildizOnlineClass-Turkce2
+schtasks /run /tn YTU-Turkce2
 ```
+
+### 5. First Zoom popup behavior
+
+On the first run, Chrome may show a native prompt such as **Open Zoom Meetings?**
+
+- The script can click web-page popups/buttons, but it cannot reliably control Chrome's native browser prompt.
+- When prompted, check **Always allow online.yildiz.edu.tr to open links of this type in the associated app** and click **Open**.
+- After you allow this once, future runs are usually fully automatic.
 
 ---
 
-## Manual run
+## Manual Run
 
-You can also run the script at any time yourself:
+Run any class immediately:
 
 ```powershell
 node attend.js turkce2
@@ -68,42 +78,43 @@ node attend.js turkce2
 
 ---
 
-## Adding more classes
+## Adding More Classes
 
-1. Open `config.js` and add a new object to the `classes` array:
+1. Open `config.js` and add a new object to the `classes` array.
+2. Open `setup-task.ps1` and add the matching task entry in `$taskClasses`.
+3. Re-run `setup-task.ps1` as Administrator.
+
+Example class entry:
 
 ```js
 {
-  id: 'matematik',
-  name: 'Matematik',
-  url: 'https://online.yildiz.edu.tr/?transaction=LMS.EDU.LessonProgram.ViewLessonProgramAsStudent/XXXXX/0',
+  id: "matematik",
+  name: "Matematik",
+  url: "https://online.yildiz.edu.tr/?transaction=LMS.EDU.LessonProgram.ViewLessonProgramAsStudent/XXXXX/0",
   schedule: { dayOfWeek: 3, hour: 14, minute: 0 },
-},
+}
 ```
-
-2. Open `setup-task.ps1` and uncomment / add the matching entry in `$taskClasses`.
-
-3. Re-run `.\setup-task.ps1` as Administrator to register the new task.
 
 ---
 
 ## Troubleshooting
 
-| Problem                                            | Fix                                                                                                                      |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Browser opens but "Canlı Derse Katıl" is not found | The button text may differ slightly. Inspect the page and update `JOIN_BUTTON_SELECTOR` in `attend.js`.                  |
-| Session expired (redirected to login)              | Run `node setup.js` again to log in and refresh the session.                                                             |
-| Task Scheduler doesn't run the script              | Check that `node.exe` path in the task action is correct. Open Task Scheduler → right-click task → Properties → Actions. |
-| Script errors with Chrome profile locked           | Make sure no other Chrome window using `./chrome-profile/` is open at the same time.                                     |
+| Problem                                         | Fix                                                                                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Browser opens but **Derse Katil** is not found  | The button text may differ on your page. Update `JOIN_BUTTON_SELECTOR` in `attend.js`. |
+| Session expired and you are redirected to login | Run `node setup.js` again and log in to refresh the saved session.                     |
+| Task Scheduler does not run the script          | Check the `node.exe` path in Task Scheduler task actions.                              |
+| Chrome profile is locked                        | Make sure no other Chrome instance is using `./chrome-profile/` at the same time.      |
+| Zoom does not open automatically                | Allow the Chrome native prompt once using the **Always allow** checkbox.               |
 
 ---
 
-## File overview
+## Project Files
 
-| File              | Purpose                                            |
-| ----------------- | -------------------------------------------------- |
-| `config.js`       | Class definitions and profile path                 |
-| `attend.js`       | Core automation script                             |
-| `setup.js`        | First-run login helper                             |
-| `setup-task.ps1`  | Registers Windows Task Scheduler tasks             |
-| `chrome-profile/` | Saved Chrome session (auto-created, not committed) |
+| File              | Purpose                                |
+| ----------------- | -------------------------------------- |
+| `config.js`       | Class definitions and shared settings  |
+| `attend.js`       | Main automation script                 |
+| `setup.js`        | One-time login/session setup           |
+| `setup-task.ps1`  | Registers Windows Task Scheduler tasks |
+| `chrome-profile/` | Saved Chrome session data              |

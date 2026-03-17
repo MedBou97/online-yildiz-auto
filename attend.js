@@ -19,9 +19,9 @@ const { profileDir, classes } = require("./config");
 const JOIN_BUTTON_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
 // How long (ms) to keep the browser open after clicking join.
-const STAY_OPEN_MS = 5 * 60 * 1000; // 5 minutes
+const STAY_OPEN_MS = 2 * 60 * 1000; // 2 minutes
 
-const JOIN_BUTTON_SELECTOR = "text=Canlı Derse Katıl";
+const JOIN_BUTTON_SELECTOR = "text=Derse Katıl";
 
 async function main() {
   const classId = process.argv[2];
