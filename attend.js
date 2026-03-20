@@ -13,6 +13,8 @@
  */
 
 const { chromium } = require("playwright");
+const fs = require("fs/promises");
+const path = require("path");
 const { profileDir, classes } = require("./config");
 
 // How long (ms) to wait for the "Canlı Derse Katıl" button to appear.
@@ -22,6 +24,22 @@ const JOIN_BUTTON_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 const STAY_OPEN_MS = 2 * 60 * 1000; // 2 minutes
 
 const JOIN_BUTTON_SELECTOR = "text=Derse Katıl";
+const LOG_FILE_PATH = path.join(__dirname, "ytu-automation-scripts.log");
+
+function formatLogTimestamp(date = new Date()) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+async function writeLogLine(message) {
+  const line = `------ ${formatLogTimestamp()}  ${message}`;
+  await fs.appendFile(LOG_FILE_PATH, `${line}\n`, "utf8");
+}
 
 async function main() {
   const classId = process.argv[2];
@@ -45,6 +63,7 @@ async function main() {
   );
   console.log(`Profile dir : ${profileDir}`);
   console.log(`URL         : ${classConfig.url}`);
+  await writeLogLine(`started ${classConfig.name}`);
 
   const context = await chromium.launchPersistentContext(profileDir, {
     channel: "chrome", // Uses your installed Google Chrome
@@ -70,19 +89,23 @@ async function main() {
     await page.waitForSelector(JOIN_BUTTON_SELECTOR, {
       timeout: JOIN_BUTTON_TIMEOUT_MS,
     });
+    await writeLogLine(`joined ${classConfig.name} clicked Derse katil button`);
 
     console.log(
       `[${new Date().toLocaleTimeString()}] Button found – clicking…`,
     );
     await page.click(JOIN_BUTTON_SELECTOR);
+    await writeLogLine(`joined ${classConfig.name} clicked Derse katil button`);
 
     console.log(
       `[${new Date().toLocaleTimeString()}] Clicked! Staying open for ${STAY_OPEN_MS / 60_000} minutes…`,
     );
     await page.waitForTimeout(STAY_OPEN_MS);
   } catch (err) {
+    await writeLogLine(`error joining ${classConfig.name}`);
     console.error(`[${new Date().toLocaleTimeString()}] Error: ${err.message}`);
   } finally {
+    await writeLogLine(`finished ${classConfig.name}`);
     console.log(`[${new Date().toLocaleTimeString()}] Closing browser.`);
     await context.close();
   }
