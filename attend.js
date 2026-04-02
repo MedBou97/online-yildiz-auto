@@ -23,6 +23,11 @@ const JOIN_BUTTON_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 // How long (ms) to keep the browser open after clicking join.
 const STAY_OPEN_MS = 2 * 60 * 1000; // 2 minutes
 
+// How long (ms) to wait for the browser to launch before giving up.
+// Chrome can hang indefinitely when the Windows screen is locked; this cap
+// ensures the process exits cleanly instead of waiting forever.
+const LAUNCH_TIMEOUT_MS = 80_000; // 80 seconds
+
 const JOIN_BUTTON_SELECTOR = "text=Derse Katıl";
 const LOG_FILE_PATH = path.join(__dirname, "ytu-automation-scripts.log");
 
@@ -63,14 +68,57 @@ async function main() {
   );
   console.log(`Profile dir : ${profileDir}`);
   console.log(`URL         : ${classConfig.url}`);
+
+  // Write to the log file immediately – this is visible even when the
+  // console window stays blank due to Windows locked-session rendering.
   await writeLogLine(`started ${classConfig.name}`);
 
-  const context = await chromium.launchPersistentContext(profileDir, {
-    channel: "chrome", // Uses your installed Google Chrome
-    headless: false, // Visible window so you can see what's happening
-    args: ["--start-maximized"],
-    viewport: null, // Disable fixed viewport when maximized
-  });
+  // ── Browser launch ────────────────────────────────────────────────────────
+  // When the Windows screen is locked, Chrome can hang indefinitely during
+  // launch (GPU / display-context unavailable).  The extra args below let
+  // Chrome run without hardware acceleration, which avoids the hang.  We
+  // also race against an explicit timeout so the process never stalls
+  // silently until the join-button timeout fires.
+  let context;
+  try {
+    const launchPromise = chromium.launchPersistentContext(profileDir, {
+      channel: "chrome", // Uses your installed Google Chrome
+      headless: false, // Visible window so you can see what's happening
+      args: [
+        "--start-maximized",
+        "--disable-gpu", // avoids GPU hang in locked session
+        "--disable-software-rasterizer", // fall back to CPU rasteriser
+        "--no-default-browser-check", // skip "make Chrome default" prompt
+        "--no-first-run", // skip first-run wizard
+      ],
+      viewport: null, // Disable fixed viewport when maximised
+      timeout: LAUNCH_TIMEOUT_MS,
+    });
+
+    // Belt-and-suspenders: race against our own timer in case Playwright's
+    // internal timeout doesn't fire (observed on some locked-screen builds).
+    const timerPromise = new Promise((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Browser launch timed out after ${LAUNCH_TIMEOUT_MS / 1000}s (screen may be locked)`,
+            ),
+          ),
+        LAUNCH_TIMEOUT_MS,
+      ),
+    );
+
+    context = await Promise.race([launchPromise, timerPromise]);
+  } catch (launchErr) {
+    await writeLogLine(
+      `launch-failed ${classConfig.name}: ${launchErr.message}`,
+    );
+    console.error(
+      `[${new Date().toLocaleTimeString()}] Browser launch failed: ${launchErr.message}`,
+    );
+    process.exit(1);
+  }
 
   const page = context.pages()[0] ?? (await context.newPage());
 
